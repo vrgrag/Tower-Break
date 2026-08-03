@@ -1,0 +1,21 @@
+*.iml
+.gradle/
+/local.properties
+/.idea/
+.DS_Store
+/build/
+/app/build/
+/captures/
+.externalNativeBuild/
+.cxx/
+
+# Release signing — never commit these
+/release.jks
+/keystore.properties
+
+# JVM crash/replay logs
+hs_err_pid*.log
+replay_pid*.log
+
+# Kotlin build metadata
+.kotlin/

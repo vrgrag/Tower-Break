@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Compose owns the real UI, so the platform theme only needs to be an
+      action-bar-less shell with the right window background (so the very first
+      frame, before Compose draws, is the game's dark chrome rather than white).
+    -->
+    <style name="Theme.TowerBreak" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/ribbon_deep</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+
+    <!-- Applied to the activity at launch so the cold-start window matches the splash. -->
+    <style name="Theme.TowerBreak.Splash" parent="Theme.TowerBreak">
+        <item name="android:windowBackground">@color/ribbon_deep</item>
+    </style>
+</resources>
