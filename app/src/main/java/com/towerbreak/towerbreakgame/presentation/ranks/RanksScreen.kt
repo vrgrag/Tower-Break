@@ -1,4 +1,4 @@
-package com.towerbreak.towerbreakgame.presentation.ranks
+﻿package com.towerbreak.towerbreakgame.presentation.ranks
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -41,8 +41,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.towerbreak.towerbreakgame.core.text.grouped
-import com.towerbreak.towerbreakgame.core.theme.BrandPalette
+import com.towerbreak.towerbreakgame.foundation.text.grouped
+import com.towerbreak.towerbreakgame.foundation.theme.BrandPalette
 import com.towerbreak.towerbreakgame.domain.model.LevelCurve
 import com.towerbreak.towerbreakgame.presentation.common.RotationLock
 import com.towerbreak.towerbreakgame.presentation.common.ScreenAxis

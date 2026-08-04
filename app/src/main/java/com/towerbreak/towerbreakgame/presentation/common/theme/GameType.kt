@@ -1,4 +1,4 @@
-package com.towerbreak.towerbreakgame.presentation.common.theme
+﻿package com.towerbreak.towerbreakgame.presentation.common.theme
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Shadow
@@ -6,7 +6,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
-import com.towerbreak.towerbreakgame.core.theme.BrandPalette
+import com.towerbreak.towerbreakgame.foundation.theme.BrandPalette
 
 /**
  * The four type roles used across the game (the Flutter `Lettering`).

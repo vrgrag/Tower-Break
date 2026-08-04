@@ -1,4 +1,4 @@
-package com.towerbreak.towerbreakgame.presentation.hub
+﻿package com.towerbreak.towerbreakgame.presentation.hub
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -51,8 +51,8 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
-import com.towerbreak.towerbreakgame.core.text.grouped
-import com.towerbreak.towerbreakgame.core.theme.BrandPalette
+import com.towerbreak.towerbreakgame.foundation.text.grouped
+import com.towerbreak.towerbreakgame.foundation.theme.BrandPalette
 import com.towerbreak.towerbreakgame.domain.model.ExternalPage
 import com.towerbreak.towerbreakgame.presentation.common.RotationLock
 import com.towerbreak.towerbreakgame.presentation.common.ScreenAxis

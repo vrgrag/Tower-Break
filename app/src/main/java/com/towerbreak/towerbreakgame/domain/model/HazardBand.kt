@@ -1,7 +1,7 @@
-package com.towerbreak.towerbreakgame.domain.model
+﻿package com.towerbreak.towerbreakgame.domain.model
 
 import androidx.compose.ui.graphics.Color
-import com.towerbreak.towerbreakgame.core.theme.BrandPalette
+import com.towerbreak.towerbreakgame.foundation.theme.BrandPalette
 import kotlin.math.max
 import kotlin.random.Random
 

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Secondary CTA — dark translucent fill + amber stroke for contrast on bright art. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#CC1A1008" />
+    <corners android:radius="18dp" />
+    <stroke android:width="2dp" android:color="#FFE8A23A" />
+</shape>

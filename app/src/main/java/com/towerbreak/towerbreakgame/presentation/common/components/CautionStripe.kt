@@ -1,4 +1,4 @@
-package com.towerbreak.towerbreakgame.presentation.common.components
+﻿package com.towerbreak.towerbreakgame.presentation.common.components
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -9,7 +9,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.unit.dp
-import com.towerbreak.towerbreakgame.core.theme.BrandPalette
+import com.towerbreak.towerbreakgame.foundation.theme.BrandPalette
 
 /**
  * The yellow-and-black diagonal stripe that trims the status ribbon and the

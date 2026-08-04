@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Round variant — identical to ic_launcher.xml; the OS picks round shape. -->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@color/ic_launcher_background" />
-    <foreground android:drawable="@mipmap/ic_launcher_foreground" />
+    <background android:drawable="@color/launch_bg" />
+    <foreground android:drawable="@drawable/tb_icon_fg_inset" />
     <monochrome android:drawable="@drawable/ic_launcher_monochrome" />
 </adaptive-icon>

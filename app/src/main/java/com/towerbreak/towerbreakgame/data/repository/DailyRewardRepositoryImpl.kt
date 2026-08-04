@@ -1,6 +1,6 @@
-package com.towerbreak.towerbreakgame.data.repository
+﻿package com.towerbreak.towerbreakgame.data.repository
 
-import com.towerbreak.towerbreakgame.core.time.GameClock
+import com.towerbreak.towerbreakgame.foundation.time.GameClock
 import com.towerbreak.towerbreakgame.data.local.PreferenceStore
 import com.towerbreak.towerbreakgame.domain.audio.GameAudio
 import com.towerbreak.towerbreakgame.domain.audio.SoundEffect

@@ -12,10 +12,20 @@
 # Release signing — never commit these
 /release.jks
 /keystore.properties
+/keystore/
+/gray.properties
+/google-services.json
+/app/google-services.json
+*.jks
 
 # JVM crash/replay logs
 hs_err_pid*.log
 replay_pid*.log
+build_output.log
 
 # Kotlin build metadata
 .kotlin/
+
+# Local previews / working copies
+/_preview/
+/icon2.png

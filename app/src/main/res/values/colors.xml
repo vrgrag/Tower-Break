@@ -4,4 +4,12 @@
     <color name="sky">#FF7FB5D6</color>
     <color name="ic_launcher_bg">#FF2F7BE0</color>
     <color name="ic_launcher_background">#FFE8842C</color>
+    <color name="bg_dark">#1A0E08</color>
+    <color name="bg_red">#6E2D12</color>
+    <color name="gold">#F2A14E</color>
+    <color name="black">#000000</color>
+    <color name="white">#FFFFFF</color>
+    <!-- Launcher / splash background — dark warm tone that matches the
+         shadow corners of icon2.png under any adaptive-icon mask shape. -->
+    <color name="launch_bg">#FF1A0E08</color>
 </resources>

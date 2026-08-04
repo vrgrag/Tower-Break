@@ -1,4 +1,4 @@
-package com.towerbreak.towerbreakgame.presentation.game
+﻿package com.towerbreak.towerbreakgame.presentation.game
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
@@ -33,9 +33,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.towerbreak.towerbreakgame.core.text.asMultiplier
-import com.towerbreak.towerbreakgame.core.text.grouped
-import com.towerbreak.towerbreakgame.core.theme.BrandPalette
+import com.towerbreak.towerbreakgame.foundation.text.asMultiplier
+import com.towerbreak.towerbreakgame.foundation.text.grouped
+import com.towerbreak.towerbreakgame.foundation.theme.BrandPalette
 import com.towerbreak.towerbreakgame.domain.model.GameTuning
 import com.towerbreak.towerbreakgame.domain.model.HazardBand
 import com.towerbreak.towerbreakgame.presentation.common.components.CandyButton

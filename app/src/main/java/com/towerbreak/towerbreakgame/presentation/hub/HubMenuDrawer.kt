@@ -1,4 +1,4 @@
-package com.towerbreak.towerbreakgame.presentation.hub
+﻿package com.towerbreak.towerbreakgame.presentation.hub
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -46,8 +46,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.towerbreak.towerbreakgame.BuildConfig
-import com.towerbreak.towerbreakgame.core.text.grouped
-import com.towerbreak.towerbreakgame.core.theme.BrandPalette
+import com.towerbreak.towerbreakgame.foundation.text.grouped
+import com.towerbreak.towerbreakgame.foundation.theme.BrandPalette
 import com.towerbreak.towerbreakgame.presentation.common.theme.GameType
 
 /**

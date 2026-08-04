@@ -1,4 +1,4 @@
-package com.towerbreak.towerbreakgame.presentation.common.components
+﻿package com.towerbreak.towerbreakgame.presentation.common.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -23,7 +23,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.towerbreak.towerbreakgame.core.theme.BrandPalette
+import com.towerbreak.towerbreakgame.foundation.theme.BrandPalette
 import com.towerbreak.towerbreakgame.presentation.common.theme.GameType
 
 /**

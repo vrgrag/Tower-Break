@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12+ (API 31) splash screen attributes.
+  These override the base Theme.TowerBreak.Splash and Theme.App styles so
+  the OS splash matches the adaptive launcher icon on the home screen.
+
+  Key points:
+  • windowSplashScreenBackground must equal @color/launch_bg so the icon's
+    dark corners are invisible (no hard halo under the icon).
+  • windowSplashScreenAnimatedIcon must reference an AdaptiveIconDrawable
+    (ic_splash_logo.xml). A plain PNG is silently dropped by the OS and it
+    falls back to the launcher icon — which it then crops aggressively.
+  • windowSplashScreenIconBackgroundColor is set to launch_bg as well so
+    the icon's inner background blends with the screen background on any
+    mask shape that reveals the icon background layer.
+-->
+<resources>
+
+    <!-- Game splash (white part) -->
+    <style name="Theme.TowerBreak.Splash" parent="Theme.TowerBreak">
+        <item name="android:windowSplashScreenBackground">@color/launch_bg</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_splash_logo</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@color/launch_bg</item>
+    </style>
+
+    <!-- Gray-part fullscreen activities (BastionGate, BastionShell, etc.)
+         use Theme.App which is AppCompat-based — splash attrs below are only
+         picked up when Theme.App is the launch theme on API 31+. -->
+    <style name="Theme.App" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">@color/bg_dark</item>
+        <item name="android:statusBarColor">@color/bg_dark</item>
+        <item name="android:navigationBarColor">@color/bg_dark</item>
+        <item name="android:windowSplashScreenBackground">@color/launch_bg</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_splash_logo</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@color/launch_bg</item>
+    </style>
+
+</resources>

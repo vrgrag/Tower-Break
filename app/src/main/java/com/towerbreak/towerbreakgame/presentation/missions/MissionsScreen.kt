@@ -1,4 +1,4 @@
-package com.towerbreak.towerbreakgame.presentation.missions
+﻿package com.towerbreak.towerbreakgame.presentation.missions
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -45,7 +45,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.towerbreak.towerbreakgame.core.theme.BrandPalette
+import com.towerbreak.towerbreakgame.foundation.theme.BrandPalette
 import com.towerbreak.towerbreakgame.domain.model.DailyMission
 import com.towerbreak.towerbreakgame.domain.model.MissionKind
 import com.towerbreak.towerbreakgame.presentation.common.RotationLock

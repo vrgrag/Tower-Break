@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Splash screen animated icon for Android 12+ (API 31+).
+  windowSplashScreenAnimatedIcon REQUIRES AdaptiveIconDrawable; a plain PNG
+  is silently ignored and the OS falls back to the launcher icon which the
+  system then clips heavily. This file makes the splash icon match the
+  launcher icon on the home screen exactly.
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/launch_bg" />
+    <foreground android:drawable="@drawable/tb_icon_fg_inset" />
+</adaptive-icon>

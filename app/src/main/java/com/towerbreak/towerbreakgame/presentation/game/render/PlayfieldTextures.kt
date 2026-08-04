@@ -1,10 +1,10 @@
-package com.towerbreak.towerbreakgame.presentation.game.render
+﻿package com.towerbreak.towerbreakgame.presentation.game.render
 
 import android.content.Context
 import android.graphics.BitmapFactory
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
-import com.towerbreak.towerbreakgame.core.asset.ArtManifest
+import com.towerbreak.towerbreakgame.foundation.asset.ArtManifest
 import com.towerbreak.towerbreakgame.presentation.game.engine.BlockMetrics
 import com.towerbreak.towerbreakgame.presentation.game.engine.PlayfieldConfig
 import dagger.hilt.android.qualifiers.ApplicationContext

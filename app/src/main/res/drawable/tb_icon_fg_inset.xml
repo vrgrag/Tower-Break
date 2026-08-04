@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Foreground layer for the adaptive launcher icon.
+  The 14 % inset on all four sides keeps icon2.png fully clear of every
+  standard mask shape (Pixel circle, squircle, teardrop, rounded-square).
+  The adaptive-icon foreground layer is drawn in a 108×108 dp canvas; the
+  safe zone is the inner 72×72 dp circle. 14 % of 108 = ~15 dp per side,
+  which places the art exactly inside that circle.
+  Adjust: bump to 17–19 % if any corner still clips; lower to 10–12 % if
+  the shield appears too small.
+-->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@mipmap/tb_icon_fg"
+    android:insetLeft="14%"
+    android:insetTop="14%"
+    android:insetRight="14%"
+    android:insetBottom="14%" />

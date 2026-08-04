@@ -1,4 +1,4 @@
-package com.towerbreak.towerbreakgame.presentation.game
+﻿package com.towerbreak.towerbreakgame.presentation.game
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -22,7 +22,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.towerbreak.towerbreakgame.core.theme.BrandPalette
+import com.towerbreak.towerbreakgame.foundation.theme.BrandPalette
 import com.towerbreak.towerbreakgame.presentation.common.RotationLock
 import com.towerbreak.towerbreakgame.presentation.common.ScreenAxis
 import com.towerbreak.towerbreakgame.presentation.common.components.StatusRibbon

@@ -1,7 +1,7 @@
-package com.towerbreak.towerbreakgame.presentation.game.engine
+﻿package com.towerbreak.towerbreakgame.presentation.game.engine
 
 import androidx.compose.ui.graphics.Color
-import com.towerbreak.towerbreakgame.core.theme.BrandPalette
+import com.towerbreak.towerbreakgame.foundation.theme.BrandPalette
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.exp

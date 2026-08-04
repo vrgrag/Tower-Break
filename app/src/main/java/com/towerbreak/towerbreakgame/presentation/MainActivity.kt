@@ -32,10 +32,21 @@ class MainActivity : ComponentActivity() {
             override fun onStop(owner: LifecycleOwner) = audio.onForeground(false)
         })
 
+        val chainedBoot = intent?.getBooleanExtra(EXTRA_CHAINED_BOOT, false) == true
+
         setContent {
             TowerBreakTheme {
-                TowerNavHost()
+                TowerNavHost(chainedBoot = chainedBoot)
             }
         }
+    }
+
+    companion object {
+        /**
+         * Set by the launcher when it already showed a loading screen for this
+         * launch, so the splash does not run a second progress bar over the same
+         * artwork.
+         */
+        const val EXTRA_CHAINED_BOOT = "chained_boot"
     }
 }

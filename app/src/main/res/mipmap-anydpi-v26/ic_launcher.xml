@@ -1,6 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Adaptive launcher icon for API 26+.
+  background: flat dark colour that blends with icon2's shadow corners so
+              no hard edge shows under any mask shape.
+  foreground: icon2.png with a 14 % inset so the art never touches the mask
+              boundary under circle, squircle or teardrop shapes.
+  monochrome: existing vector silhouette, used for themed icons on Android 13+.
+-->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@color/ic_launcher_background" />
-    <foreground android:drawable="@mipmap/ic_launcher_foreground" />
+    <background android:drawable="@color/launch_bg" />
+    <foreground android:drawable="@drawable/tb_icon_fg_inset" />
     <monochrome android:drawable="@drawable/ic_launcher_monochrome" />
 </adaptive-icon>

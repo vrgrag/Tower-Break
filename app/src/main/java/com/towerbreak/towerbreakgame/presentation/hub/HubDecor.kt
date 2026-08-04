@@ -1,4 +1,4 @@
-package com.towerbreak.towerbreakgame.presentation.hub
+﻿package com.towerbreak.towerbreakgame.presentation.hub
 
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -20,7 +20,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import com.towerbreak.towerbreakgame.core.theme.BrandPalette
+import com.towerbreak.towerbreakgame.foundation.theme.BrandPalette
 import kotlin.math.PI
 import kotlin.math.sin
 

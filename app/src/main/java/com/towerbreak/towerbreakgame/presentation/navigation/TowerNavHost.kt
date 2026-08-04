@@ -22,9 +22,16 @@ import com.towerbreak.towerbreakgame.presentation.webview.WebPageScreen
 /**
  * The single navigation graph. Cross-fades between destinations mirror the
  * original `FadeTransition` splash→hub hand-off.
+ *
+ * [chainedBoot] is true when the launcher already showed a loading screen before
+ * handing the game control; the splash then runs its warm-up without replaying
+ * the progress bar.
  */
 @Composable
-fun TowerNavHost(navController: NavHostController = rememberNavController()) {
+fun TowerNavHost(
+    navController: NavHostController = rememberNavController(),
+    chainedBoot: Boolean = false,
+) {
     NavHost(
         navController = navController,
         startDestination = Routes.SPLASH,
@@ -38,6 +45,7 @@ fun TowerNavHost(navController: NavHostController = rememberNavController()) {
                         popUpTo(Routes.SPLASH) { inclusive = true }
                     }
                 },
+                chained = chainedBoot,
             )
         }
 

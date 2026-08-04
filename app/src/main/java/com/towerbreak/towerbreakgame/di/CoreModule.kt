@@ -1,8 +1,8 @@
-package com.towerbreak.towerbreakgame.di
+﻿package com.towerbreak.towerbreakgame.di
 
-import com.towerbreak.towerbreakgame.core.di.ApplicationScope
-import com.towerbreak.towerbreakgame.core.time.GameClock
-import com.towerbreak.towerbreakgame.core.time.SystemGameClock
+import com.towerbreak.towerbreakgame.foundation.di.ApplicationScope
+import com.towerbreak.towerbreakgame.foundation.time.GameClock
+import com.towerbreak.towerbreakgame.foundation.time.SystemGameClock
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn

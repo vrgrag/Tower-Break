@@ -1,4 +1,4 @@
-package com.towerbreak.towerbreakgame.presentation.webview
+﻿package com.towerbreak.towerbreakgame.presentation.webview
 
 import android.content.Intent
 import android.graphics.Color as AndroidColor
@@ -35,7 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.towerbreak.towerbreakgame.core.theme.BrandPalette
+import com.towerbreak.towerbreakgame.foundation.theme.BrandPalette
 import com.towerbreak.towerbreakgame.domain.model.ExternalPage
 import com.towerbreak.towerbreakgame.presentation.common.RotationLock
 import com.towerbreak.towerbreakgame.presentation.common.ScreenAxis
