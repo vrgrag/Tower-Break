@@ -112,7 +112,7 @@ val fcmChannelTitle = pickOne(listOf(
     "Announcements", "Rewards", "Deals", "News"
 ))
 
-val pushSnoozeSeconds   = pick(172_800L..604_800L)
+val pushSnoozeSeconds   = pick(172_800L..259_200L)
 val organicGcdDelayMs   = pick(3_500L..7_500L)
 val configTimeoutMs     = pick(11_000L..22_000L)
 val attributionFirstMs  = pick(22_000L..38_000L)

@@ -13,6 +13,7 @@ import android.graphics.Typeface
 import android.os.SystemClock
 import android.view.View
 import androidx.annotation.DrawableRes
+import kotlin.math.min
 
 /**
  * Branded loading / splash screen with an animated indicator.
@@ -86,9 +87,13 @@ class BastionLoader(
 
         // Caption dots — always animating (never frozen).
         val dots = ".".repeat(((elapsed / 400L) % 4L).toInt())
-        textPaint.textSize = h * 0.030f
+        // Text size is based on the shorter screen dimension so the caption
+        // does not shrink to unreadable in landscape (was h * 0.030f, i.e. tied
+        // to the short axis in landscape and the long axis in portrait).
+        val ref = min(w, h)
+        textPaint.textSize = ref * 0.055f
         textPaint.color = accent
-        textPaint.setShadowLayer(h * 0.006f, 0f, h * 0.003f, Color.BLACK)
+        textPaint.setShadowLayer(ref * 0.010f, 0f, ref * 0.005f, Color.BLACK)
         canvas.drawText("Loading$dots", w / 2f, h * 0.885f, textPaint)
         textPaint.clearShadowLayer()
 

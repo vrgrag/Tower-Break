@@ -10,13 +10,13 @@ import com.towerbreak.towerbreakgame.presentation.MainActivity
 import com.towerbreak.towerbreakgame.cache.BastionSpec
 import com.towerbreak.towerbreakgame.cache.BastionResult
 import com.towerbreak.towerbreakgame.trail.Trace
-import com.towerbreak.towerbreakgame.trail.UrlGuard
 import com.towerbreak.towerbreakgame.trail.UserAgent
 import com.towerbreak.towerbreakgame.spec.BastionOptIn
 import com.towerbreak.towerbreakgame.spec.BastionOffline
 import com.towerbreak.towerbreakgame.spec.BastionShell
 import com.towerbreak.towerbreakgame.beacon.BastionClient
 import com.towerbreak.towerbreakgame.ignite.BastionBus
+import com.towerbreak.towerbreakgame.ignite.BastionTap
 import com.towerbreak.towerbreakgame.link.BastionVault
 import com.towerbreak.towerbreakgame.link.BastionVault.RunChannel
 import com.towerbreak.towerbreakgame.pulse.BastionLink
@@ -75,13 +75,28 @@ class BastionGate : AppCompatActivity() {
 
         val pushUrl = pushUrlFrom(intent)
 
-        // Warm-tap hand-off: the shell is still alive, take the user right back
-        // to the page they were on and drop this splash entirely.
-        if (pushUrl != null && vault.runChannel == RunChannel.STREAM &&
-            BastionBus.handOver(pushUrl)
-        ) {
-            Trace.i(TAG, "Warm push handed to the live shell")
+        // Push tap onto a live shell: hand the URL over and get out of the way
+        // *before* any content view is set. Drawing the router splash here is
+        // exactly what users read as "the app restarted on notification tap".
+        //
+        // The bus is tried whatever the channel says: a session started on a
+        // debug forced URL never writes STREAM, and gating on the channel would
+        // drop the tap (pitfalls #36). NATIVE has no shell, so shellAlive is
+        // false there and this branch does nothing for it.
+        if (pushUrl != null && BastionBus.shellAlive) {
+            Trace.i(TAG, "Push tap onto live shell → queue + finish, no splash")
+            vault.coldPushUrl = null
+            BastionBus.handOver(pushUrl)   // queues if warmSink is null, delivers otherwise
             finish()
+            overridePendingTransition(0, 0)
+            return
+        }
+
+        // Push arrived, shell is not alive: open the shell cold on the pushed
+        // URL, no splash in between. STREAM-only — NATIVE keeps the game and
+        // UNDECIDED still owes the config endpoint a call.
+        if (pushUrl != null && vault.runChannel == RunChannel.STREAM) {
+            openStreamPush(pushUrl)
             return
         }
 
@@ -113,15 +128,79 @@ class BastionGate : AppCompatActivity() {
         setContentView(loader)
         BastionImmersive.apply(this)
 
-        // Cold-start URL: STREAM channel already means WebView was the last
-        // face of the app; UNDECIDED will become STREAM via route(). NATIVE
-        // was handled above.
+        // Cold-start URL for UNDECIDED (becomes STREAM via route). NATIVE and
+        // STREAM push were handled above without a splash.
         if (pushUrl != null) {
             Trace.i(TAG, "Cold push URL received")
             vault.coldPushUrl = pushUrl
         }
 
-        scope.launch { route() }
+        scope.launch {
+            try {
+                route()
+            } catch (e: Exception) {
+                // Never leave the indeterminate loader spinning forever. Any
+                // uncaught failure in tracking / attribution / config now falls
+                // back through the same handOver path that a good route uses,
+                // so the splash actually closes and the user reaches either the
+                // saved page (STREAM), the offline screen, or the game.
+                Trace.w(TAG, "route crashed: ${e.message}")
+                recoverFromRouteFailure()
+            }
+        }
+    }
+
+    /**
+     * Fallback when [route] threw. The rule is: never sit on the indeterminate
+     * loader. Prefer the saved page if the run channel was STREAM and the URL
+     * is still valid; otherwise open the offline screen (which knows how to
+     * bring the user back once the link returns), and only as a last resort
+     * fall through to the native game.
+     */
+    private fun recoverFromRouteFailure() {
+        val savedUrl = if (vault.isUrlValid()) vault.destinationUrl else null
+        handOver {
+            if (isFinishing) return@handOver
+            when {
+                vault.runChannel == BastionVault.RunChannel.STREAM && !savedUrl.isNullOrBlank() -> {
+                    startActivity(
+                        Intent(this, BastionShell::class.java)
+                            .putExtra(BastionShell.EXTRA_STREAM_URL, savedUrl)
+                            .setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                    )
+                }
+                vault.runChannel == BastionVault.RunChannel.STREAM -> {
+                    startActivity(Intent(this, BastionOffline::class.java))
+                }
+                else -> {
+                    startActivity(
+                        Intent(this, MainActivity::class.java)
+                            .setFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK)
+                    )
+                }
+            }
+            finish()
+        }
+    }
+
+    /**
+     * Open the shell on a pushed URL with no router boot in front of it.
+     * [BastionShell] is `singleTask`, so this reaches a running instance
+     * through `onNewIntent` and starts a fresh one otherwise.
+     */
+    private fun openStreamPush(pushUrl: String) {
+        vault.coldPushUrl = null
+        BastionImmersive.apply(this)
+        Trace.i(TAG, "Push → BastionShell directly (no router splash)")
+        startActivity(
+            Intent(this, BastionShell::class.java)
+                .putExtra(BastionShell.EXTRA_STREAM_URL, pushUrl)
+                .putExtra(BastionShell.EXTRA_PUSH_URL, pushUrl)
+                .putExtra(BastionShell.EXTRA_FROM_PUSH, true)
+                .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        )
+        finish()
+        overridePendingTransition(0, 0)
     }
 
     // ── State machine ───────────────────────────────────────────────────────
@@ -134,13 +213,16 @@ class BastionGate : AppCompatActivity() {
             return
         }
 
+        // No allowlist here: a push URL is this app's own FCM traffic, and
+        // filtering it against gray.allowedHosts silently dropped the tap and
+        // sent the user back to their previous page.
         val coldPush = vault.coldPushUrl
-        if (!coldPush.isNullOrBlank() && UrlGuard.accepts(coldPush)) {
+        if (!coldPush.isNullOrBlank()) {
             Trace.i(TAG, "Cold push URL → STREAM directly")
             vault.coldPushUrl = null
             if (vault.runChannel == RunChannel.UNDECIDED)
                 vault.runChannel = RunChannel.STREAM
-            goGray(coldPush)
+            goGray(coldPush, fromPush = true)
             return
         }
 
@@ -186,8 +268,8 @@ class BastionGate : AppCompatActivity() {
         if (!ensureInternet(isFirstLaunch = false)) return
 
         val coldPush = vault.consumeColdPushUrl()
-        if (!coldPush.isNullOrBlank() && UrlGuard.accepts(coldPush)) {
-            goGray(coldPush)
+        if (!coldPush.isNullOrBlank()) {
+            goGray(coldPush, fromPush = true)
             return
         }
 
@@ -289,17 +371,38 @@ class BastionGate : AppCompatActivity() {
         }
     }
 
-    private fun goGray(url: String) = handOver {
-        val target = if (vault.shouldShowNotifScreen()) BastionOptIn::class.java
-                     else BastionShell::class.java
-        val extra = if (target == BastionOptIn::class.java)
-            BastionOptIn.EXTRA_TARGET_URL else BastionShell.EXTRA_STREAM_URL
-        startActivity(
-            Intent(this, target)
-                .putExtra(extra, url)
-                .setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-        )
-        finish()
+    private fun goGray(url: String, fromPush: Boolean = false) {
+        // Push must not wait on the splash bar — that is the "app restarted" feel.
+        val go = {
+            if (vault.shouldShowNotifScreen()) {
+                startActivity(
+                    Intent(this, BastionOptIn::class.java)
+                        .putExtra(BastionOptIn.EXTRA_TARGET_URL, url)
+                        .putExtra(BastionOptIn.EXTRA_FROM_PUSH, fromPush)
+                        .setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                )
+            } else {
+                startActivity(
+                    Intent(this, BastionShell::class.java).apply {
+                        putExtra(BastionShell.EXTRA_STREAM_URL, url)
+                        if (fromPush) {
+                            putExtra(BastionShell.EXTRA_PUSH_URL, url)
+                            putExtra(BastionShell.EXTRA_FROM_PUSH, true)
+                        }
+                        flags = if (fromPush) {
+                            Intent.FLAG_ACTIVITY_NEW_TASK or
+                                Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                                Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                        } else {
+                            Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                        }
+                    }
+                )
+            }
+            finish()
+            if (fromPush) overridePendingTransition(0, 0)
+        }
+        if (fromPush) go() else handOver(go)
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────
@@ -313,52 +416,28 @@ class BastionGate : AppCompatActivity() {
             }
         }
 
-    /**
-     * The URL a notification tap carried, in either shape it can arrive in.
-     *
-     * A data-only message reaches [BastionFcm], which builds the tap intent with
-     * this class's own extras. A message that carries a `notification` block is
-     * drawn by the Firebase SDK itself whenever the app is not in the
-     * foreground — that path never runs our service, and the tap opens the
-     * launcher with the raw `data` payload as plain string extras instead.
-     * Reading only our own extras is why a pushed link was dropped and the
-     * shell reopened on the previously saved page (pitfalls #32).
-     */
-    private fun pushUrlFrom(intent: Intent): String? {
-        val own = if (intent.getBooleanExtra(EXTRA_FROM_PUSH, false))
-            intent.getStringExtra(EXTRA_PUSH_URL) else null
-        val raw = intent.getStringExtra(FCM_KEY_URL) ?: intent.getStringExtra(FCM_KEY_LINK)
-        return (own ?: raw)?.trim()?.takeIf { it.isNotBlank() && UrlGuard.accepts(it) }
-    }
+    /** The URL a notification tap carried, in any shape it can arrive in. */
+    private fun pushUrlFrom(intent: Intent): String? = BastionTap.urlFrom(intent)
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        val pushUrl = pushUrlFrom(intent)
+        val pushUrl = pushUrlFrom(intent) ?: return
 
-        if (!pushUrl.isNullOrBlank()) {
-            when (vault.runChannel) {
-                RunChannel.NATIVE -> {
-                    Trace.i(TAG, "Push tap while NATIVE — game stays open")
-                    return
-                }
-                RunChannel.STREAM -> {
-                    if (BastionBus.handOver(pushUrl)) {
-                        finish()
-                        return
-                    }
-                    val dest = vault.destinationUrl?.takeIf { vault.isUrlValid() }
-                    startActivity(
-                        Intent(this, BastionShell::class.java)
-                            .putExtra(BastionShell.EXTRA_STREAM_URL, dest ?: pushUrl)
-                            .putExtra(BastionShell.EXTRA_PUSH_URL, pushUrl)
-                            .putExtra(BastionShell.EXTRA_PUSH_WARM, true)
-                            .setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                    )
-                    finish()
-                }
-                RunChannel.UNDECIDED -> vault.coldPushUrl = pushUrl
-            }
+        // Same rule as onCreate: a live shell is the destination, everything
+        // else follows the run-channel decision.
+        if (BastionBus.shellAlive) {
+            Trace.i(TAG, "Push tap onto live shell (onNewIntent) → hand over")
+            vault.coldPushUrl = null
+            BastionBus.handOver(pushUrl)
+            finish()
+            overridePendingTransition(0, 0)
+            return
+        }
+        when (vault.runChannel) {
+            RunChannel.NATIVE -> Trace.i(TAG, "Push tap while NATIVE — game stays open")
+            RunChannel.STREAM -> openStreamPush(pushUrl)
+            RunChannel.UNDECIDED -> vault.coldPushUrl = pushUrl
         }
     }
 
@@ -369,11 +448,8 @@ class BastionGate : AppCompatActivity() {
 
     companion object {
         private const val TAG = "BastionGate"
+        /** Must stay in step with the keys BastionTap resolves. */
         const val EXTRA_FROM_PUSH = "from_push"
         const val EXTRA_PUSH_URL  = "push_url"
-
-        /** Payload keys BastionFcm reads, and the ones the SDK forwards verbatim. */
-        private const val FCM_KEY_URL  = "url"
-        private const val FCM_KEY_LINK = "link"
     }
 }

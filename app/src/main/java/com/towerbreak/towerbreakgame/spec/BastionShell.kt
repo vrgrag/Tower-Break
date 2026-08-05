@@ -6,6 +6,7 @@ import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import android.view.View
 import android.view.WindowInsets
 import android.view.WindowManager
@@ -27,6 +28,7 @@ import com.towerbreak.towerbreakgame.cache.BastionSpec
 import com.towerbreak.towerbreakgame.trail.Trace
 import com.towerbreak.towerbreakgame.trail.UserAgent
 import com.towerbreak.towerbreakgame.ignite.BastionBus
+import com.towerbreak.towerbreakgame.ignite.BastionTap
 import com.towerbreak.towerbreakgame.link.BastionVault
 import com.towerbreak.towerbreakgame.pulse.BastionLink
 import kotlinx.coroutines.CoroutineScope
@@ -123,20 +125,21 @@ class BastionShell : AppCompatActivity() {
         hideSystemUi()
         enableNotchCutout()
 
-        // Back navigation: walk WebView history while there is any.
-        // On the first page nothing happens — back must NOT close the app.
-        backCallback = object : OnBackPressedCallback(false) {
+        // Always-enabled callback: the system never sees the back press, so it
+        // can never close the Activity. On the first page navigateBack() finds
+        // no prior entry and silently does nothing — the user stays put. On
+        // subsequent pages it steps through real history, skipping about:blank.
+        backCallback = object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                if (wv.canGoBack()) wv.goBack()
+                navigateBack()
             }
         }
         onBackPressedDispatcher.addCallback(this, backCallback)
 
-        // Choose the initial URL: warm push > intent extra > saved.
-        val warmPush = intent.takeIf { it.getBooleanExtra(EXTRA_PUSH_WARM, false) }
-            ?.getStringExtra(EXTRA_PUSH_URL)
-        val coldPush = vault.consumeColdPushUrl()
-        val initial  = warmPush
+        // Choose the initial URL: push (tap extras / cold stash) > extra > saved.
+        val pushFromIntent = BastionTap.urlFrom(intent)
+        val coldPush = vault.consumeColdPushUrl()?.takeIf { it.isNotBlank() }
+        val initial  = pushFromIntent
             ?: coldPush
             ?: intent.getStringExtra(EXTRA_STREAM_URL)
             ?: vault.destinationUrl
@@ -145,7 +148,16 @@ class BastionShell : AppCompatActivity() {
             Trace.w(TAG, "No URL to load — finishing")
             finish(); return
         }
-        Trace.i(TAG, "loading initial URL (warm=${warmPush != null}, cold=${coldPush != null})")
+        if (pushFromIntent != null || coldPush != null) {
+            vault.coldPushUrl = null
+            pushLandedAtMs = SystemClock.elapsedRealtime()
+        }
+        Trace.i(TAG, "loading initial URL (push=${pushFromIntent != null}, cold=${coldPush != null})")
+        // The cover goes up before the engine is handed anything. onPageStarted
+        // does not fire until Chromium commits to a navigation, which is several
+        // frames later — and the WebView draws black until then, which is the
+        // black screen reported on cold and push launches.
+        raiseCover()
         wv.loadUrl(initial)
 
         // Connectivity monitoring — react instantly on OS callback.
@@ -334,10 +346,9 @@ class BastionShell : AppCompatActivity() {
             retryPending = false
             keyboard.forget()
             if (url != BLANK) deepestHop = url
-            if (url != BLANK && !firstPageSettled) raiseCover()
-            // Sync back-button availability as the navigation begins so the
-            // button is live even before the page fully loads.
-            backCallback.isEnabled = view.canGoBack()
+            // The cover is NOT raised here. It went up in onCreate for the
+            // session's first page, and raising it per navigation is the scrim
+            // that flashes on every redirect hop (pitfalls #33).
             Trace.i(TAG, "onPageStarted")
         }
 
@@ -390,17 +401,20 @@ class BastionShell : AppCompatActivity() {
         override fun onPageFinished(view: WebView, url: String) {
             Trace.i(TAG, "onPageFinished")
             if (loadFailed || url == BLANK) return
+            val wasFirstPage = !firstPageSettled
             redirectRetries = 0
             entryPointRetried = false
             retryPending = false
             firstPageSettled = true
             lastMainFrameUrl = url
             deepestHop = url
+            // The engine records every redirect hop and every retry as a real
+            // back-stack entry, so the first Back would land on hop 19 of the
+            // chain or on the error page a retry was launched from. Making the
+            // first settled page the base entry drops all of it (pitfalls #37).
+            if (wasFirstPage) view.clearHistory()
             injectSafeAreaKill()
             view.evaluateJavascript(keyboard.script, null)
-            // Settled page — update back availability with the history
-            // the engine now reports (may have grown or shrunk).
-            backCallback.isEnabled = view.canGoBack()
             dropCover()
         }
 
@@ -558,6 +572,35 @@ class BastionShell : AppCompatActivity() {
 
     @Volatile private var navigatedOffline = false
 
+    /** When a push URL was last handed to the WebView. Guards late re-routing. */
+    private var pushLandedAtMs = 0L
+
+    /** The notification promo gets one showing per Activity instance. */
+    private var optInOffered = false
+
+    /**
+     * Step back to the nearest real page. about:blank entries are the black
+     * screen users hit after error recovery / offline blanks — skip them.
+     * With no meaningful prior page, stay put (never finish the activity).
+     */
+    private fun navigateBack() {
+        val list = wv.copyBackForwardList()
+        var idx = list.currentIndex - 1
+        while (idx >= 0) {
+            val u = list.getItemAtIndex(idx)?.url
+            if (!u.isNullOrBlank() && !isBlankUrl(u)) {
+                wv.goBackOrForward(idx - list.currentIndex)
+                return
+            }
+            idx--
+        }
+        // Nowhere real to go — callback stays enabled but does nothing, so
+        // back on the first page is a silent no-op instead of exiting the app.
+    }
+
+    private fun isBlankUrl(url: String): Boolean =
+        url == BLANK || url.startsWith("about:blank")
+
     private fun goOffline() {
         if (navigatedOffline) return
         navigatedOffline = true
@@ -574,20 +617,30 @@ class BastionShell : AppCompatActivity() {
         setIntent(intent)
         navigatedOffline = false
 
-        if (intent.getBooleanExtra(EXTRA_PUSH_WARM, false)) {
-            val url = intent.getStringExtra(EXTRA_PUSH_URL)
-            if (!url.isNullOrBlank() && com.towerbreak.towerbreakgame.trail.UrlGuard.accepts(url)) {
-                Trace.i(TAG, "warm push → loading")
-                wv.loadUrl(url)
-                return
-            }
+        // Push URL wins over the saved stream destination — otherwise a tap
+        // reopens the previous page and looks like "notifications don't work".
+        val pushUrl = BastionTap.urlFrom(intent)
+        if (pushUrl != null) {
+            Trace.i(TAG, "push → loading")
+            vault.coldPushUrl = null
+            pushLandedAtMs = SystemClock.elapsedRealtime()
+            wv.loadUrl(pushUrl)
+            return
+        }
+
+        // Anything arriving right behind a push tap (the OS re-delivering the
+        // launcher intent, a screen handing control back) must not reload the
+        // saved page over the link the user just opened.
+        if (SystemClock.elapsedRealtime() - pushLandedAtMs < PUSH_HOLD_MS) {
+            Trace.i(TAG, "onNewIntent ignored — push navigation in flight")
+            return
         }
 
         val streamUrl = intent.getStringExtra(EXTRA_STREAM_URL)
         val current = wv.url
         val target = streamUrl ?: vault.destinationUrl
         if (!target.isNullOrBlank() &&
-            (current.isNullOrBlank() || current == BLANK || current != target)) {
+            (current.isNullOrBlank() || isBlankUrl(current) || current != target)) {
             Trace.i(TAG, "onNewIntent → reloading target")
             wv.loadUrl(target)
         }
@@ -631,6 +684,22 @@ class BastionShell : AppCompatActivity() {
         container.requestApplyInsets()
         keyboard.remeasure()
         BastionImmersive.apply(this)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Belt-and-braces for the push-tap hand-off. onStart already consumes
+        // the bus queue for the common case (Activity returning to foreground),
+        // but a push that lands with the shell already fully resumed (window
+        // still on screen, launcher intent absorbed by BastionGate.finish())
+        // only fires onResume once the OS re-focuses this instance. Draining
+        // the queue here as well is what makes the tapped URL actually load.
+        BastionBus.consume()?.let { url ->
+            Trace.i(TAG, "queued push URL (onResume) → loading")
+            vault.coldPushUrl = null
+            pushLandedAtMs = SystemClock.elapsedRealtime()
+            runCatching { wv.loadUrl(url) }
+        }
     }
 
     private fun hideSystemUi() = BastionImmersive.apply(this)
@@ -728,8 +797,47 @@ class BastionShell : AppCompatActivity() {
         }
         BastionBus.consume()?.let { url ->
             Trace.i(TAG, "queued push URL → loading")
+            vault.coldPushUrl = null
+            pushLandedAtMs = SystemClock.elapsedRealtime()
             runCatching { wv.loadUrl(url) }
         }
+
+        // The per-Activity `optInOffered` guard is what stops the promo from
+        // re-appearing after 3 days when the shell stayed alive in the
+        // background: onStart runs, the snooze has elapsed, but the flag from
+        // the previous showing still says "already shown here". Clear it once
+        // the snooze is up so the promo can come back on schedule.
+        if (optInOffered && vault.shouldShowNotifScreen()) {
+            optInOffered = false
+        }
+
+        try {
+            maybeOfferNotifications()
+        } catch (e: Exception) {
+            Trace.w(TAG, "maybeOfferNotifications failed: ${e.message}")
+        }
+    }
+
+    /**
+     * Launcher taps resume this singleTask shell without re-entering
+     * BastionGate, so a snooze that has run out would never be noticed there.
+     *
+     * Three guards, all of them earned: the promo must never sit on top of a
+     * page the user reached from a notification (it comes back through
+     * [BastionOptIn.EXTRA_OVER_SHELL] and the pushed page stays put), it must
+     * not appear over the session's first load, and it gets one showing per
+     * Activity so a permission dialog returning here cannot loop it.
+     */
+    private fun maybeOfferNotifications() {
+        if (isFinishing || optInOffered || !firstPageSettled) return
+        if (SystemClock.elapsedRealtime() - pushLandedAtMs < PUSH_HOLD_MS) return
+        if (!vault.shouldShowNotifScreen()) return
+        optInOffered = true
+        Trace.i(TAG, "notif snooze elapsed → BastionOptIn")
+        startActivity(
+            Intent(this, BastionOptIn::class.java)
+                .putExtra(BastionOptIn.EXTRA_OVER_SHELL, true)
+        )
     }
 
     override fun onStop() {
@@ -748,7 +856,8 @@ class BastionShell : AppCompatActivity() {
     companion object {
         const val EXTRA_STREAM_URL = "stream_url"
         const val EXTRA_PUSH_URL   = "push_url"
-        const val EXTRA_PUSH_WARM  = "push_warm"
+        /** Set when the shell is opened from a notification tap (cold or warm). */
+        const val EXTRA_FROM_PUSH  = "from_push"
         private const val TAG = "BastionShell"
 
         /** Everything the WebView itself can take. Anything else belongs to an app. */
@@ -779,5 +888,8 @@ class BastionShell : AppCompatActivity() {
          *  engine finish unwinding the failed navigation, short enough to be
          *  invisible. */
         private const val RETRY_PAUSE_MS = 60L
+
+        /** Window after a push load in which nothing else may re-route the view. */
+        private const val PUSH_HOLD_MS = 8_000L
     }
 }

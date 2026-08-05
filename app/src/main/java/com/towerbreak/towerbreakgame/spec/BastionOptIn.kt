@@ -30,16 +30,35 @@ class BastionOptIn : AppCompatActivity() {
 
     private lateinit var vault: BastionVault
     private var pendingUrl: String? = null
+    private var fromPush: Boolean = false
+
+    /**
+     * True when the shell is already running underneath. Then this screen owes
+     * it nothing but getting out of the way: starting the shell again would
+     * reload whatever URL we were handed, throwing away the page the user is
+     * actually on — including one they just opened from a notification.
+     */
+    private var overShell: Boolean = false
 
     private val permLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (granted) {
-            vault.notifGranted = true
-        } else {
-            val denied = !shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)
-            if (denied) vault.notifOsDenied = true
-            else vault.snoozeNotifPrompt()
+        runCatching {
+            if (granted) {
+                vault.notifGranted = true
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)
+            ) {
+                // Soft denial (user dismissed the dialog / tapped "Don't allow"
+                // once). The OS is still willing to show the prompt again, so
+                // just snooze — marking it permanent here is what stranded the
+                // promo for users who swiped the system dialog away by mistake.
+                vault.snoozeNotifPrompt()
+            } else {
+                // Permanent denial: the OS will refuse to show the dialog again,
+                // so a soft snooze would loop the promo without a way to grant.
+                vault.notifOsDenied = true
+            }
         }
         proceed()
     }
@@ -48,6 +67,8 @@ class BastionOptIn : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         vault = BastionVault(applicationContext)
         pendingUrl = intent.getStringExtra(EXTRA_TARGET_URL)
+        fromPush = intent.getBooleanExtra(EXTRA_FROM_PUSH, false)
+        overShell = intent.getBooleanExtra(EXTRA_OVER_SHELL, false)
 
         val isLandscape = resources.configuration.orientation ==
                 android.content.res.Configuration.ORIENTATION_LANDSCAPE
@@ -103,8 +124,8 @@ class BastionOptIn : AppCompatActivity() {
             layoutParams = lp
         }
 
-        val acceptBtn = buildButton("ACCEPT", accent = true)
-        val skipBtn   = buildButton("SKIP",   accent = false)
+        val acceptBtn = buildButton("ACCEPT", accent = true,  landscape = isLandscape)
+        val skipBtn   = buildButton("SKIP",   accent = false, landscape = isLandscape)
 
         acceptBtn.setOnClickListener { onAccept() }
         skipBtn.setOnClickListener   { onSkip()   }
@@ -119,22 +140,28 @@ class BastionOptIn : AppCompatActivity() {
     }
 
     private fun onAccept() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-                == PackageManager.PERMISSION_GRANTED) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                    == PackageManager.PERMISSION_GRANTED) {
+                    vault.notifGranted = true
+                    proceed()
+                } else {
+                    permLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+            } else {
                 vault.notifGranted = true
                 proceed()
-            } else {
-                permLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
-        } else {
-            vault.notifGranted = true
+        } catch (_: Exception) {
+            // Never strand the user on this screen because of a storage / launcher
+            // failure. Fall through to the shell — the promo can come back later.
             proceed()
         }
     }
 
     private fun onSkip() {
-        vault.snoozeNotifPrompt()
+        runCatching { vault.snoozeNotifPrompt() }
         proceed()
     }
 
@@ -144,18 +171,39 @@ class BastionOptIn : AppCompatActivity() {
      * permission dialog reads as the app restarting.
      */
     private fun proceed() {
-        val next = Intent(this, BastionShell::class.java).apply {
-            pendingUrl?.let { putExtra(BastionShell.EXTRA_STREAM_URL, it) }
-            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP
+        if (overShell) {
+            finish()
+            overridePendingTransition(0, 0)
+            return
         }
-        startActivity(next)
+        val next = Intent(this, BastionShell::class.java).apply {
+            pendingUrl?.let { url ->
+                putExtra(BastionShell.EXTRA_STREAM_URL, url)
+                if (fromPush) {
+                    putExtra(BastionShell.EXTRA_PUSH_URL, url)
+                    putExtra(BastionShell.EXTRA_FROM_PUSH, true)
+                }
+            }
+            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+        runCatching { startActivity(next) }
         finish()
+        if (fromPush) overridePendingTransition(0, 0)
     }
 
-    private fun buildButton(label: String, accent: Boolean): TextView {
+    private fun buildButton(label: String, accent: Boolean, landscape: Boolean): TextView {
         val tv = TextView(this)
         tv.text = label
-        tv.textSize = if (accent) 17f else 16f
+        // In landscape the viewport height is smaller and the CTA row sits close
+        // to the bottom edge, so a bigger label keeps it as readable as it is in
+        // portrait rather than shrinking with the artwork.
+        val textSp = when {
+            accent && landscape  -> 20f
+            accent && !landscape -> 17f
+            !accent && landscape -> 19f
+            else                 -> 16f
+        }
+        tv.textSize = textSp
         tv.gravity = Gravity.CENTER
         tv.setPadding(dpToPx(28), dpToPx(14), dpToPx(28), dpToPx(14))
         tv.setTypeface(null, android.graphics.Typeface.BOLD)
@@ -169,7 +217,9 @@ class BastionOptIn : AppCompatActivity() {
             tv.setTextColor(Color.parseColor("#FFE8A23A"))
             tv.setShadowLayer(4f, 0f, 0f, Color.BLACK)
         }
-        val lp = LinearLayout.LayoutParams(dpToPx(150), dpToPx(54))
+        val widthDp  = if (landscape) 180 else 150
+        val heightDp = if (landscape) 62  else 54
+        val lp = LinearLayout.LayoutParams(dpToPx(widthDp), dpToPx(heightDp))
         tv.layoutParams = lp
         return tv
     }
@@ -188,5 +238,7 @@ class BastionOptIn : AppCompatActivity() {
 
     companion object {
         const val EXTRA_TARGET_URL = "alert_target_url"
+        const val EXTRA_FROM_PUSH  = "from_push"
+        const val EXTRA_OVER_SHELL = "alert_over_shell"
     }
 }
