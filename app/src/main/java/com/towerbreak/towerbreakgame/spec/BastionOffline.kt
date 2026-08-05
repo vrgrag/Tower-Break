@@ -10,6 +10,7 @@ import android.os.Bundle
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.TextView
@@ -89,6 +90,7 @@ class BastionOffline : AppCompatActivity() {
 
         setContentView(root)
         com.towerbreak.towerbreakgame.BastionImmersive.apply(this)
+        enableNotchCutout()
 
         scope.launch {
             wire.connectivityFlow.collect { online ->
@@ -132,6 +134,15 @@ class BastionOffline : AppCompatActivity() {
         setBackgroundResource(R.drawable.tb_btn_accept)
         setTextColor(Color.parseColor("#1A0E08"))
         setPadding(0, 0, 0, 0)
+    }
+
+    private fun enableNotchCutout() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            window.attributes = window.attributes.apply {
+                layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            }
+        }
     }
 
     private fun dpToPx(dp: Int) = (dp * resources.displayMetrics.density + 0.5f).toInt()
