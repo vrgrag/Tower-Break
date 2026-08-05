@@ -75,13 +75,9 @@ class BastionOffline : AppCompatActivity() {
         retryBtn = btn
         btn.setOnClickListener { tryRetry() }
 
-        // Use real display width to compute left margin so the button lands on
-        // the true horizontal centre regardless of notch insets or safe-area padding.
-        val displayWidth = resources.displayMetrics.widthPixels
-        val btnWidthPx  = dpToPx(200)
+        val btnWidthPx = dpToPx(200)
         val lp = FrameLayout.LayoutParams(btnWidthPx, dpToPx(52))
-        lp.gravity     = Gravity.BOTTOM
-        lp.leftMargin  = (displayWidth - btnWidthPx) / 2
+        lp.gravity      = Gravity.BOTTOM
         lp.bottomMargin = dpToPx(if (isLandscape) 34 else 52)
         btn.layoutParams = lp
         root.addView(btn)
@@ -89,6 +85,26 @@ class BastionOffline : AppCompatActivity() {
         enableNotchCutout()
         setContentView(root)
         com.towerbreak.towerbreakgame.BastionImmersive.apply(this)
+
+        // Re-center after the first layout pass so we use the real root width
+        // (displayMetrics.widthPixels differs from root.width in landscape when
+        // a navigation bar or cutout is present, causing a leftward shift).
+        root.post {
+            val params = btn.layoutParams as FrameLayout.LayoutParams
+            // In landscape with a button-style navigation bar on the right the
+            // nav bar inset is excluded from root.width, shifting the computed
+            // centre leftward. Compensate with half the right-inset so the
+            // button visually aligns with the centred artwork plate.
+            val navBarOffset = if (isLandscape) {
+                val insetsCompat = androidx.core.view.ViewCompat.getRootWindowInsets(root)
+                val navRight = insetsCompat
+                    ?.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars())
+                    ?.right ?: 0
+                navRight + dpToPx(10)
+            } else 0
+            params.leftMargin = (root.width - btnWidthPx) / 2 + navBarOffset
+            btn.layoutParams = params
+        }
 
         scope.launch {
             wire.connectivityFlow.collect { online ->
