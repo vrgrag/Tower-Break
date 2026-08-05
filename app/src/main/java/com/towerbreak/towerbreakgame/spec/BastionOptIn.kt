@@ -46,17 +46,11 @@ class BastionOptIn : AppCompatActivity() {
         runCatching {
             if (granted) {
                 vault.notifGranted = true
-            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)
-            ) {
-                // Soft denial (user dismissed the dialog / tapped "Don't allow"
-                // once). The OS is still willing to show the prompt again, so
-                // just snooze — marking it permanent here is what stranded the
-                // promo for users who swiped the system dialog away by mistake.
-                vault.snoozeNotifPrompt()
             } else {
-                // Permanent denial: the OS will refuse to show the dialog again,
-                // so a soft snooze would loop the promo without a way to grant.
+                // Any OS-dialog denial is treated as permanent. Skip is the
+                // soft path — if the user touches the system dialog and says
+                // no, showing the promo again would only loop them back to a
+                // dialog the OS will no longer show, which is the broken UX.
                 vault.notifOsDenied = true
             }
         }
