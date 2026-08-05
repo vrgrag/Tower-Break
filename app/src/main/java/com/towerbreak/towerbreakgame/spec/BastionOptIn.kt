@@ -166,7 +166,7 @@ class BastionOptIn : AppCompatActivity() {
     }
 
     private fun onSkip() {
-        runCatching { vault.snoozeNotifPrompt() }
+        runCatching { vault.notifOsDenied = true }
         proceed()
     }
 
