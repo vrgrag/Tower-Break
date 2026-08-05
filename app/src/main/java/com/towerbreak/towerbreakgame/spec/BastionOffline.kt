@@ -75,22 +75,20 @@ class BastionOffline : AppCompatActivity() {
         retryBtn = btn
         btn.setOnClickListener { tryRetry() }
 
-        // Horizontally centered on the full window — no cutout/safe-area padding
-        // (landscape notches must not shift RETRY relative to the art plate).
-        val lp = FrameLayout.LayoutParams(
-            dpToPx(200),
-            dpToPx(52),
-            Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL,
-        )
+        // Use real display width to compute left margin so the button lands on
+        // the true horizontal centre regardless of notch insets or safe-area padding.
+        val displayWidth = resources.displayMetrics.widthPixels
+        val btnWidthPx  = dpToPx(200)
+        val lp = FrameLayout.LayoutParams(btnWidthPx, dpToPx(52))
+        lp.gravity     = Gravity.BOTTOM
+        lp.leftMargin  = (displayWidth - btnWidthPx) / 2
         lp.bottomMargin = dpToPx(if (isLandscape) 34 else 52)
-        lp.marginStart = 0
-        lp.marginEnd = 0
         btn.layoutParams = lp
         root.addView(btn)
 
+        enableNotchCutout()
         setContentView(root)
         com.towerbreak.towerbreakgame.BastionImmersive.apply(this)
-        enableNotchCutout()
 
         scope.launch {
             wire.connectivityFlow.collect { online ->
