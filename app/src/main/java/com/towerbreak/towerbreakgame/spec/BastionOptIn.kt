@@ -167,14 +167,9 @@ class BastionOptIn : AppCompatActivity() {
 
     private fun onSkip() {
         runCatching {
-            if (vault.notifSkipUntil > 0L) {
-                // User has already skipped once before — permanent refusal.
-                vault.notifOsDenied = true
-            } else {
-                // First skip — come back in exactly 3 days.
-                vault.notifSkipUntil =
-                    System.currentTimeMillis() / 1000 + 3L * 24 * 3600
-            }
+            // Each SKIP snoozes the prompt for exactly 3 days.
+            vault.notifSkipUntil =
+                System.currentTimeMillis() / 1000 + 3L * 24 * 3600
         }
         proceed()
     }
