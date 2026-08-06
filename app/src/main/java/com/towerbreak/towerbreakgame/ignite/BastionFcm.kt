@@ -9,7 +9,6 @@ import androidx.core.app.NotificationCompat
 import com.towerbreak.towerbreakgame.BuildConfig
 import com.towerbreak.towerbreakgame.R
 import com.towerbreak.towerbreakgame.trail.Trace
-import com.towerbreak.towerbreakgame.trail.UrlGuard
 import com.towerbreak.towerbreakgame.pane.BastionGate
 import com.towerbreak.towerbreakgame.link.BastionVault
 import com.google.firebase.messaging.FirebaseMessagingService
@@ -28,10 +27,14 @@ import java.net.URL
  * [BuildConfig] rather than hardcoded here.
  *
  * URL handling:
- *   * A URL that fails [UrlGuard] is dropped silently — a push tap must never
- *     open a page the app cannot recognise.
- *   * Warm URLs (shell alive) go straight to [BastionBus] and are never saved.
- *   * Cold URLs go into the vault and are consumed exactly once by the router.
+ *   * No host allowlist. A push comes from this app's own FCM project; the
+ *     allowlist meant for config-endpoint answers used to be applied here and
+ *     silently dropped every campaign link on an unlisted host, leaving the
+ *     launcher to route the tap as an ordinary start.
+ *   * A shell on screen takes the URL through [BastionBus] and no notification
+ *     is posted at all.
+ *   * Otherwise the URL is stashed in the vault and the tap opens the launcher,
+ *     which hands it to a live shell or opens one on it.
  *   * A user whose channel is NATIVE keeps their game: the URL becomes a
  *     harmless notification, and the tap opens the launcher instead of the
  *     WebView. Flipping a NATIVE user into a WebView after the fact is a
@@ -58,47 +61,73 @@ class BastionFcm : FirebaseMessagingService() {
         super.onMessageReceived(msg)
         val data = msg.data
         val notif = msg.notification
-        val title = data["title"] ?: notif?.title ?: return
-        val body  = data["body"]  ?: notif?.body  ?: return
-        val rawUrl = data["url"] ?: data["link"] ?: ""
+
+        // A missing title or body is not a reason to drop the message: the URL
+        // is the point of the push, and an empty field only means the sender
+        // relies on the defaults. Returning here (previous behaviour) threw the
+        // destination away before anything had a chance to route on it.
+        val title = data["title"] ?: notif?.title ?: getString(R.string.app_name)
+        val body  = data["body"]  ?: notif?.body  ?: ""
         val imgUrl = data["image"] ?: notif?.imageUrl?.toString() ?: ""
 
-        val url = rawUrl.trim()
-        val urlOk = url.isNotEmpty() && UrlGuard.accepts(url)
-        if (url.isNotEmpty() && !urlOk) {
-            Trace.w(TAG, "push URL rejected by allowlist — showing text-only notification")
-        }
+        val url = pickUrl(data, notif)
+        if (body.isBlank() && url.isEmpty()) return
+        if (url.isEmpty()) Trace.w(TAG, "push has no URL — data keys: ${data.keys.joinToString()}")
 
         val vault = BastionVault(applicationContext)
+        val native = vault.runChannel == BastionVault.RunChannel.NATIVE
 
-        // Warm hand-off works for STREAM users only. NATIVE stays native.
-        if (urlOk && vault.runChannel == BastionVault.RunChannel.STREAM &&
-            BastionBus.onWarmUrl != null
-        ) {
+        // Shell on screen: load it in place and post nothing. Gated on the live
+        // callback rather than the run channel — a debug forced session never
+        // writes STREAM, and the channel gate would drop it (pitfalls #36).
+        // A NATIVE install has no shell, so the lock below still holds.
+        if (url.isNotEmpty() && !native && BastionBus.onWarmUrl != null) {
             val delivered = runCatching { BastionBus.handOver(url) }.getOrDefault(false)
             if (delivered) return
         }
 
-        // Cold-start save is also STREAM-only. A NATIVE user gets the text; the
-        // launcher never sees the URL and never routes on it.
-        val stashUrl = if (urlOk && vault.runChannel != BastionVault.RunChannel.NATIVE) url else ""
-        if (stashUrl.isNotEmpty()) vault.coldPushUrl = stashUrl
+        // The URL a tap may carry. A NATIVE user gets the text only: the
+        // launcher never sees the URL and never routes on it. Flipping a NATIVE
+        // install into a WebView after the fact is a store-review problem.
+        val tapUrl = if (native) "" else url
 
-        bg.launch { showNotification(title, body, stashUrl, imgUrl) }
+        // Stashed unconditionally. Gating this on `!shellAlive` (previous
+        // behaviour) lost the destination whenever the process was recycled
+        // between the message arriving and the user tapping — the launcher then
+        // started cold with nothing to route on. Every consumer takes it
+        // exactly once, and the live-shell path in BastionGate clears it.
+        if (tapUrl.isNotEmpty()) vault.coldPushUrl = tapUrl
+
+        bg.launch { showNotification(title, body, tapUrl, imgUrl) }
     }
 
-    private suspend fun showNotification(title: String, body: String, url: String, imgUrl: String) {
+    /** Backends label the destination differently; take the first key holding one. */
+    private fun pickUrl(data: Map<String, String>, notif: RemoteMessage.Notification?): String {
+        URL_KEYS.firstNotNullOfOrNull { data[it]?.trim()?.takeIf(::isWebUrl) }?.let { return it }
+        data.entries.firstOrNull { (k, v) ->
+            !k.contains("image", true) && !k.contains("icon", true) && isWebUrl(v.trim())
+        }?.let { return it.value.trim() }
+        return notif?.clickAction?.trim()?.takeIf(::isWebUrl) ?: ""
+    }
+
+    private suspend fun showNotification(
+        title: String,
+        body: String,
+        url: String,
+        imgUrl: String,
+    ) {
         val ctx = applicationContext
         val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         BastionChannel.ensure(ctx)
 
-        val tap = Intent(ctx, BastionGate::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
-            if (url.isNotBlank()) putExtra(BastionGate.EXTRA_PUSH_URL, url)
-            putExtra(BastionGate.EXTRA_FROM_PUSH, true)
-        }
+        val tap = tapIntent(ctx, url)
+        // A per-notification request code. Sharing one across notifications lets
+        // FLAG_UPDATE_CURRENT rewrite the extras of a PendingIntent that is still
+        // pending, so an older notification would open the newest URL.
         val pi = PendingIntent.getActivity(
-            ctx, System.currentTimeMillis().toInt(), tap,
+            ctx,
+            System.currentTimeMillis().toInt(),
+            tap,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
@@ -134,8 +163,36 @@ class BastionFcm : FirebaseMessagingService() {
         }
     }
 
+    /**
+     * Every tap goes through the launcher, whether the shell is alive or not.
+     *
+     * Targeting BastionShell directly with a PendingIntent (previous design)
+     * relies on the OS to deliver an intent into a singleTask activity that
+     * is not the task root; several OEM ROMs relaunch the task from its root
+     * instead, which is exactly the "app restarts on notification tap" the
+     * user reported. BastionGate is the task root, so a tap always resolves
+     * onto it — and its onCreate hands the URL to the live shell via
+     * BastionBus without ever drawing its own splash (see BastionGate).
+     */
+    private fun tapIntent(ctx: Context, url: String): Intent =
+        Intent(ctx, BastionGate::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                Intent.FLAG_ACTIVITY_SINGLE_TOP
+            if (url.isNotBlank()) putExtra(BastionGate.EXTRA_PUSH_URL, url)
+            putExtra(BastionGate.EXTRA_FROM_PUSH, true)
+        }
+
+    private fun isWebUrl(value: String?): Boolean =
+        !value.isNullOrBlank() &&
+            (value.startsWith("http://", true) || value.startsWith("https://", true))
+
     companion object {
         private const val TAG = "BastionFcm"
+        private const val NOTIF_REQ = 42001
         @Volatile private var NOTIF_ID = 1001
+
+        /** Data keys checked before falling back to scanning the whole payload. */
+        private val URL_KEYS = listOf("url", "link", "deeplink", "deep_link", "target_url")
     }
 }
