@@ -575,9 +575,6 @@ class BastionShell : AppCompatActivity() {
     /** When a push URL was last handed to the WebView. Guards late re-routing. */
     private var pushLandedAtMs = 0L
 
-    /** The notification promo gets one showing per Activity instance. */
-    private var optInOffered = false
-
     /**
      * Step back to the nearest real page. about:blank entries are the black
      * screen users hit after error recovery / offline blanks — skip them.
@@ -802,42 +799,6 @@ class BastionShell : AppCompatActivity() {
             runCatching { wv.loadUrl(url) }
         }
 
-        // The per-Activity `optInOffered` guard is what stops the promo from
-        // re-appearing after 3 days when the shell stayed alive in the
-        // background: onStart runs, the snooze has elapsed, but the flag from
-        // the previous showing still says "already shown here". Clear it once
-        // the snooze is up so the promo can come back on schedule.
-        if (optInOffered && vault.shouldShowNotifScreen()) {
-            optInOffered = false
-        }
-
-        try {
-            maybeOfferNotifications()
-        } catch (e: Exception) {
-            Trace.w(TAG, "maybeOfferNotifications failed: ${e.message}")
-        }
-    }
-
-    /**
-     * Launcher taps resume this singleTask shell without re-entering
-     * BastionGate, so a snooze that has run out would never be noticed there.
-     *
-     * Three guards, all of them earned: the promo must never sit on top of a
-     * page the user reached from a notification (it comes back through
-     * [BastionOptIn.EXTRA_OVER_SHELL] and the pushed page stays put), it must
-     * not appear over the session's first load, and it gets one showing per
-     * Activity so a permission dialog returning here cannot loop it.
-     */
-    private fun maybeOfferNotifications() {
-        if (isFinishing || optInOffered || !firstPageSettled) return
-        if (SystemClock.elapsedRealtime() - pushLandedAtMs < PUSH_HOLD_MS) return
-        if (!vault.shouldShowNotifScreen()) return
-        optInOffered = true
-        Trace.i(TAG, "notif snooze elapsed → BastionOptIn")
-        startActivity(
-            Intent(this, BastionOptIn::class.java)
-                .putExtra(BastionOptIn.EXTRA_OVER_SHELL, true)
-        )
     }
 
     override fun onStop() {

@@ -33,14 +33,6 @@ class BastionOptIn : AppCompatActivity() {
     private var pendingUrl: String? = null
     private var fromPush: Boolean = false
 
-    /**
-     * True when the shell is already running underneath. Then this screen owes
-     * it nothing but getting out of the way: starting the shell again would
-     * reload whatever URL we were handed, throwing away the page the user is
-     * actually on — including one they just opened from a notification.
-     */
-    private var overShell: Boolean = false
-
     private val permLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -63,7 +55,6 @@ class BastionOptIn : AppCompatActivity() {
         vault = BastionVault(applicationContext)
         pendingUrl = intent.getStringExtra(EXTRA_TARGET_URL)
         fromPush = intent.getBooleanExtra(EXTRA_FROM_PUSH, false)
-        overShell = intent.getBooleanExtra(EXTRA_OVER_SHELL, false)
 
         val isLandscape = resources.configuration.orientation ==
                 android.content.res.Configuration.ORIENTATION_LANDSCAPE
@@ -175,16 +166,10 @@ class BastionOptIn : AppCompatActivity() {
     }
 
     /**
-     * Straight to the shell, and deliberately not back through the launcher: the
-     * splash has had its one showing for this launch, and bringing it back after the
-     * permission dialog reads as the app restarting.
+     * Always navigates straight to BastionShell. Never loops back through the
+     * router splash — the branded loader had its one showing for this launch.
      */
     private fun proceed() {
-        if (overShell) {
-            finish()
-            overridePendingTransition(0, 0)
-            return
-        }
         val next = Intent(this, BastionShell::class.java).apply {
             pendingUrl?.let { url ->
                 putExtra(BastionShell.EXTRA_STREAM_URL, url)
@@ -195,7 +180,7 @@ class BastionOptIn : AppCompatActivity() {
             }
             flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
         }
-        runCatching { startActivity(next) }
+        startActivity(next)
         finish()
         if (fromPush) overridePendingTransition(0, 0)
     }
@@ -248,6 +233,5 @@ class BastionOptIn : AppCompatActivity() {
     companion object {
         const val EXTRA_TARGET_URL = "alert_target_url"
         const val EXTRA_FROM_PUSH  = "from_push"
-        const val EXTRA_OVER_SHELL = "alert_over_shell"
     }
 }

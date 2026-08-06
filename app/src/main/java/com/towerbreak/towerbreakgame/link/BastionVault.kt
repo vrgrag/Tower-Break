@@ -106,15 +106,27 @@ class BastionVault(ctx: Context) {
 
     var notifSkipUntil: Long
         get() = plain.getLong(BuildConfig.K_NOTIF_SKIP, 0L)
-        set(v) = plain.edit().putLong(BuildConfig.K_NOTIF_SKIP, v).apply()
+        set(v) { plain.edit().putLong(BuildConfig.K_NOTIF_SKIP, v).commit() }
 
     var notifGranted: Boolean
         get() = plain.getBoolean(BuildConfig.K_NOTIF_GRANTED, false)
-        set(v) = plain.edit().putBoolean(BuildConfig.K_NOTIF_GRANTED, v).apply()
+        set(v) { plain.edit().putBoolean(BuildConfig.K_NOTIF_GRANTED, v).commit() }
 
     var notifOsDenied: Boolean
         get() = plain.getBoolean(BuildConfig.K_NOTIF_OS_DENIED, false)
-        set(v) = plain.edit().putBoolean(BuildConfig.K_NOTIF_OS_DENIED, v).apply()
+        set(v) { plain.edit().putBoolean(BuildConfig.K_NOTIF_OS_DENIED, v).commit() }
+
+    /**
+     * Older builds incorrectly set notifOsDenied on a simple SKIP tap, which
+     * permanently suppressed the prompt even though the OS was never asked.
+     * If the OS was never asked (notifGranted stays false) we treat osDenied as
+     * stale and clear it so the snooze-based schedule takes over again.
+     */
+    fun healStaleOsDenied() {
+        if (notifOsDenied && !notifGranted) {
+            notifOsDenied = false
+        }
+    }
 
     fun shouldShowNotifScreen(): Boolean {
         if (notifGranted) return false
@@ -125,7 +137,9 @@ class BastionVault(ctx: Context) {
 
     fun snoozeNotifPrompt() {
         val now = System.currentTimeMillis() / 1000
-        notifSkipUntil = now + BuildConfig.PUSH_SNOOZE_SEC
+        // commit(): Shell.onStart reads this immediately after Skip/Accept and
+        // must not see a stale 0 that would re-open the promo in a loop.
+        plain.edit().putLong(BuildConfig.K_NOTIF_SKIP, now + BuildConfig.PUSH_SNOOZE_SEC).commit()
     }
 
     // ── FCM token ───────────────────────────────────────────────────────────

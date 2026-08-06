@@ -73,6 +73,10 @@ class BastionGate : AppCompatActivity() {
         vault = BastionVault(applicationContext)
         wire  = BastionLink(applicationContext)
 
+        // Older builds set notifOsDenied on SKIP (never the right thing). Clear
+        // it so snooze-based scheduling takes over on affected devices.
+        vault.healStaleOsDenied()
+
         val pushUrl = pushUrlFrom(intent)
 
         // Push tap onto a live shell: hand the URL over and get out of the way
